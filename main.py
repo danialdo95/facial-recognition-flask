@@ -111,4 +111,4 @@ def detect_faces_in_image(file_stream):
     return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(threaded=True, port=5000, debug=True)
+    app.run()
