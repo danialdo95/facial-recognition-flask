@@ -51,7 +51,7 @@ def upload_image():
     return '''
     <!doctype html>
     <title>Is this a picture of Obama?</title>
-    <h1>Upload a picture and see if it's a picture of Obama</h1>
+    <h1>Upload a picture and see if it's a picture of Obama!</h1>
     <form method="POST" enctype="multipart/form-data">
       <input type="file" name="file">
       <input type="submit" value="Upload">
