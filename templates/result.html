@@ -1,0 +1,96 @@
+
+<style>
+    body {
+	font-family: Tahoma;
+	margin: 0;
+	padding: 0;
+	text-align: center;
+}
+a {
+	text-decoration: none;
+	color: darkblue;
+}
+a:hover {
+	text-decoration: underline;
+}
+img {
+	width: 175px;
+	height: 250px;
+	border: 2px solid #aaa;
+}
+#header {
+	background-color: #8C1B08;
+	color: #fff;
+	padding: 5px;
+}
+#header a{
+	color: #fff;
+	text-decoration: none;
+}
+#main table {
+	margin: 0 auto;
+}
+#footer {
+	font: 12px Tahoma;
+	margin: 25px 0 50px 0;
+}
+#footer a {
+	margin-right: 10px;
+}
+</style>
+
+<div id="header">
+	<h1><a href="index.html">FACIAL REGOGNITION</a></h1>
+</div>
+<div id="main">
+
+	<h3>Result</h3>
+    <!-- <h2></h2> -->
+    {% if face_found %}
+       <h4>Image contain a face</h4>
+    {% else %}
+        <h4>Image does not contain a face</h4>
+    {% endif %}
+	<table>
+		<tr>
+            <td><img src="data:image/jpg;base64,{{ sourceImg }}"></td>
+            {% if is_match %}
+                <h1>{{ fileImg }}</h1>
+                <td>match</td>
+            {% else %}
+                <td>no match</td>
+            {% endif %}
+            {% if face_found %}
+                {% if is_match %}
+                    <td><img src="{{ url_for('static', filename = './known/' + fileImg + '.jpg') }}" ></td>
+                {% else %}
+                <td><img src="{{ url_for('static', filename = './unknown.jpg') }}"></td>
+                 {% endif %}
+            {% else %}
+                <td><img src="{{ url_for('static', filename = './unknown.jpg') }}"></td>
+            {% endif %}
+			<!-- <td><img src="https://www.erberk.com.tr/oyuncular/47621/03_47621_01.jpg" /></td> -->
+		</tr>
+	</table>
+</div>
+<div id="footer">
+
+	<br />
+	<a href="/">Home</a>
+	<a href="about.html">About</a>
+	<a href="submit.html">Submit</a>
+	<a href="rankings.html">Rankings</a>
+</div>
+
+<script>
+$(document).ready(function() {
+        $("body").keydown(function(e) {
+            if (e.which == 37) {
+                alert("left");
+            } else if (e.which == 39) {
+                alert("right");
+            }
+        });
+});
+
+</script>
