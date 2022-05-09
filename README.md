@@ -1,4 +1,4 @@
 # facial-recognition-flask
 
 Heroku Example Url
-https://inphosoft-facial-recognition.herokuapp.com/
+https://activate-facial-recognition.herokuapp.com/
