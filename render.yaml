@@ -3,6 +3,9 @@ services:
     name: facial-recognition-flask
     runtime: python
     plan: free
+    # Pinned explicitly: the repo also has a stale `main` branch that does
+    # not contain this project and fails with a missing requirements.txt.
+    branch: master
     buildCommand: pip install -r requirements.txt && python scripts/fetch_models.py
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 60
     healthCheckPath: /healthz
