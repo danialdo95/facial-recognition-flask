@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: facial-recognition-flask
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python scripts/fetch_models.py
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 60
+    healthCheckPath: /healthz
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: MATCH_THRESHOLD
+        value: "0.363"

@@ -1,0 +1,63 @@
+{# Result panel. Rendered bare for htmx, and wrapped by result.html on full page loads. #}
+<section class="card" style="margin-top:1.25rem">
+  {% if error %}
+    <div class="notice notice-error" role="alert">{{ error }}</div>
+
+  {% elif faces is not defined or faces|length == 0 %}
+    <div class="result-head"><h1>No face found</h1></div>
+    <div class="notice">We couldn&rsquo;t detect a face in that image. Try a clearer, front-facing photo.</div>
+    {% if source_image %}
+      <img class="result-image" style="margin-top:1rem"
+           src="data:{{ source_mime }};base64,{{ source_image }}" alt="The image you uploaded">
+    {% endif %}
+
+  {% else %}
+    {% set matched = faces | selectattr('name') | list %}
+    <div class="result-head">
+      <h1>
+        {{ faces|length }} face{{ '' if faces|length == 1 else 's' }} found
+      </h1>
+      <span class="badge {{ 'badge-ok' if matched else 'badge-no' }}">
+        {{ matched|length }} recognised
+      </span>
+    </div>
+
+    <div class="result-layout">
+      <img class="result-image" src="data:{{ source_mime }};base64,{{ source_image }}"
+           alt="The image you uploaded">
+
+      <div class="matches">
+        {% for face in faces %}
+          <article class="match {{ 'is-match' if face.name }}">
+            {% if face.name %}
+              <img src="{{ url_for('static', filename='known/' ~ face.file) }}" alt="{{ face.name }}">
+            {% else %}
+              <span class="match-blank" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+                     stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+                  <circle cx="12" cy="9" r="3.2"/>
+                  <path d="M5.5 19c.9-3.1 3.4-4.8 6.5-4.8s5.6 1.7 6.5 4.8"/>
+                </svg>
+              </span>
+            {% endif %}
+
+            <div class="match-body">
+              <div class="match-name">{{ face.name or 'Unknown person' }}</div>
+              <div class="match-sub">
+                {% if face.name %}
+                  {{ face.confidence }}% confidence &middot; similarity {{ '%.3f'|format(face.score) }}
+                {% else %}
+                  Closest similarity {{ '%.3f'|format(face.score) }} &mdash; below the match threshold
+                {% endif %}
+              </div>
+              <div class="meter" role="img"
+                   aria-label="Similarity {{ '%.0f'|format(face.score * 100) }} percent">
+                <span style="width: {{ [ (face.score * 100) | round, 100 ] | min }}%"></span>
+              </div>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</section>

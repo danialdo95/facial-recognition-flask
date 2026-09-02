@@ -1,73 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Facial Recognition{% endblock %}
 
+{% block content %}
+<section class="hero">
+  <h1>Who is in this photo?</h1>
+  <p>Upload an image and it will be matched against {{ known_names|length }} known {{ 'face' if known_names|length == 1 else 'faces' }}.</p>
+</section>
 
-<style>
-  body {
-font-family: Tahoma;
-margin: 0;
-padding: 0;
-text-align: center;
-}
-a {
-text-decoration: none;
-color: darkblue;
-}
-a:hover {
-text-decoration: underline;
-}
-img {
-width: 175px;
-height: 250px;
-border: 2px solid #aaa;
-}
-#header {
-background-color: #8C1B08;
-color: #fff;
-padding: 5px;
-}
-#header a{
-color: #fff;
-text-decoration: none;
-}
-#main table {
-margin: 0 auto;
-}
-#footer {
-font: 12px Tahoma;
-margin: 25px 0 50px 0;
-}
-#footer a {
-margin-right: 10px;
-}
-</style>
+{% if not ready %}
+  <div class="notice notice-error" role="alert">
+    The recognition models are not loaded. Run <code>python scripts/fetch_models.py</code> and restart the server.
+  </div>
+{% endif %}
 
-<div id="header">
-<h1><a href="index.html">FACIAL RECOGNITION</a></h1>
-</div>
-<div id="main">
-    <h3>Upload a photo and see if it's recognized by the system</h3>
-    <form method="POST" enctype="multipart/form-data">
-      <input type="file" name="file">
-      <input type="submit" value="Upload">
-    </form>
-</div>
-<div id="footer">
+<form class="card"
+      hx-post="{{ url_for('recognize') }}"
+      hx-target="#result"
+      hx-swap="innerHTML"
+      hx-encoding="multipart/form-data"
+      enctype="multipart/form-data"
+      method="post"
+      action="{{ url_for('recognize') }}">
 
-<br />
-<a href="/">Home</a>
-<a href="about.html">About</a>
-<a href="submit.html">Submit</a>
-<a href="rankings.html">Rankings</a>
-</div>
+  <label class="dropzone" id="dropzone">
+    <input type="file" name="file" id="file-input" accept="image/jpeg,image/png,image/webp" required>
+    <span class="dz-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <path d="M17 8l-5-5-5 5"/><path d="M12 3v13"/>
+      </svg>
+    </span>
+    <span class="dz-title">Drop a photo here, or click to browse</span>
+    <span class="dz-hint">JPG, PNG or WebP &middot; up to 8&nbsp;MB</span>
+  </label>
+
+  <div class="preview" id="preview">
+    <img id="preview-img" alt="">
+    <div class="preview-meta">
+      <div class="preview-name" id="preview-name"></div>
+      <div class="preview-size" id="preview-size"></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" type="submit" id="submit-btn" {% if not ready %}disabled{% endif %}>
+      <span class="spinner" aria-hidden="true"></span>
+      <span class="btn-label">Recognize face</span>
+    </button>
+    <button class="btn btn-ghost" type="reset" id="reset-btn">Clear</button>
+  </div>
+</form>
+
+<div id="result" aria-live="polite"></div>
+
+{% if known_names %}
+<section class="known">
+  <h2>Known faces</h2>
+  <div class="known-grid">
+    {% for name, filename in known_files.items() %}
+      <figure class="known-item">
+        <img src="{{ url_for('static', filename='known/' ~ filename) }}" alt="{{ name }}" loading="lazy">
+        <span>{{ name }}</span>
+      </figure>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 
 <script>
-$(document).ready(function() {
-      $("body").keydown(function(e) {
-          if (e.which == 37) {
-              alert("left");
-          } else if (e.which == 39) {
-              alert("right");
-          }
-      });
-});
+  (function () {
+    const zone = document.getElementById('dropzone');
+    const input = document.getElementById('file-input');
+    const preview = document.getElementById('preview');
+    const img = document.getElementById('preview-img');
+    const nameEl = document.getElementById('preview-name');
+    const sizeEl = document.getElementById('preview-size');
 
+    function formatBytes(bytes) {
+      return bytes < 1024 * 1024
+        ? (bytes / 1024).toFixed(0) + ' KB'
+        : (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function showPreview() {
+      const file = input.files && input.files[0];
+      if (!file) { preview.classList.remove('is-visible'); return; }
+      img.src = URL.createObjectURL(file);
+      nameEl.textContent = file.name;
+      sizeEl.textContent = formatBytes(file.size);
+      preview.classList.add('is-visible');
+    }
+
+    input.addEventListener('change', showPreview);
+
+    ['dragenter', 'dragover'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        zone.classList.add('is-dragging');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(function (evt) {
+      zone.addEventListener(evt, function (e) {
+        e.preventDefault();
+        zone.classList.remove('is-dragging');
+      });
+    });
+
+    zone.addEventListener('drop', function (e) {
+      if (e.dataTransfer.files.length) {
+        input.files = e.dataTransfer.files;
+        showPreview();
+      }
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', function () {
+      preview.classList.remove('is-visible');
+      document.getElementById('result').innerHTML = '';
+    });
+  })();
 </script>
+{% endblock %}

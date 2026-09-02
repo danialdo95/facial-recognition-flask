@@ -1,97 +1,105 @@
-# This is a _very simple_ example of a web service that recognizes faces in uploaded images.
-#
-# $ curl -XPOST -F "file=@obama2.jpg" http://127.0.0.1:5001
-#
-# This example is based on the Flask file upload example: http://flask.pocoo.org/docs/0.12/patterns/fileuploads/
-#
-# NOTE: This example requires flask to be installed! You can install it with pip:
-# $ pip3 install flask
+"""A small Flask service that recognises faces in uploaded images."""
 
-import face_recognition, os, base64
-from flask import Flask, jsonify, request, redirect, render_template
+import sys
 
-# You can change this to any folder on your system
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+if sys.version_info < (3, 12):
+    raise SystemExit(
+        f"This app needs Python 3.12+ (NumPy 2.x requires it), but this "
+        f"interpreter is {sys.version.split()[0]} at {sys.executable}.\n"
+        f"Rebuild the virtualenv with an explicit interpreter:\n"
+        f"    rm -rf .venv && python3.13 -m venv .venv\n"
+        f"    source .venv/bin/activate && pip install -r requirements.txt"
+    )
+
+import base64
+import logging
+import os
+
+from flask import Flask, render_template, request
+
+from recognizer import ModelsMissing, Recognizer
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+log = logging.getLogger(__name__)
+
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
+MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_BYTES
+
+try:
+    recognizer = Recognizer()
+except ModelsMissing as exc:
+    log.error("%s", exc)
+    recognizer = None
 
 
 def allowed_file(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-@app.route('/', methods=['GET', 'POST'])
-def upload_image():
-    print(request.files)
-    # Check if a valid image file was uploaded
-    if request.method == 'POST':
-        if 'file' not in request.files:
-            return redirect(request.url)
-
-        file = request.files['file']
-
-        if file.filename == '':
-            return redirect(request.url)
-
-        if file and allowed_file(file.filename):
-            # The image file seems valid! Detect faces and return the result.
-            return detect_faces_in_image(file)
-
-    # If no valid image file was uploaded, show the file upload form:
-    return render_template('index.html')
+def render_result(**kwargs):
+    """Render the result panel, as a bare fragment for htmx requests."""
+    template = "partials/result.html" if request.headers.get("HX-Request") else "result.html"
+    return render_template(template, **kwargs)
 
 
-def detect_faces_in_image(file_stream):
+@app.route("/", methods=["GET"])
+def index():
+    return render_template(
+        "index.html",
+        known_names=recognizer.names if recognizer else [],
+        known_files=recognizer.files if recognizer else {},
+        ready=recognizer is not None,
+    )
 
-    #file_stream
-    # print(base64.b64encode(file_stream.read()))
-    final_data = base64.b64encode(file_stream.read()).decode("utf-8")
-    # img_base64 = img_base.decode('ascii')
-    # data["data"] = img_base64
-    # flist.append(data)
-    # final_data = {'files':flist}
 
-    # Load the uploaded image file
-    img = face_recognition.load_image_file(file_stream)
-    # Get face encodings for any faces in the uploaded image
-    unknown_face_encodings = face_recognition.face_encodings(img)
+@app.route("/recognize", methods=["POST"])
+def recognize():
+    if recognizer is None:
+        return render_result(error="The recognition models are not loaded on the server."), 503
 
-    face_found = False
-    is_match = False
-    fileImg = "Not Recognize"
+    upload = request.files.get("file")
+    if upload is None or upload.filename == "":
+        return render_result(error="Please choose an image first."), 400
 
-    if len(unknown_face_encodings) > 0:
-        face_found = True
+    if not allowed_file(upload.filename):
+        return render_result(
+            error="Unsupported file type. Use a JPG, PNG or WebP image."
+        ), 400
 
-        
-        for filename in os.listdir('./static/known'):
-            if filename.endswith(".jpg") or filename.endswith(".png"): 
-                # print(os.path.join(directory, filename))
-                image_of_barrack = face_recognition.load_image_file('./static/known/' + filename)
-                print(filename)
-                # print("File known Image", image_of_barrack)
-                known_face_encoding = face_recognition.face_encodings(image_of_barrack)[0]
+    image_bytes = upload.read()
+    if not image_bytes:
+        return render_result(error="That file was empty."), 400
 
-                match_results = face_recognition.compare_faces([known_face_encoding], unknown_face_encodings[0], tolerance=0.5)
-                if match_results[0]:
-                    is_match = True
-                    fileImg = os.path.splitext(filename)[0]
-                    print("result", match_results)
-                    break
-                continue
-        # See if the first face in the uploaded image matches the known face of Obama
-      
+    faces, error = recognizer.identify(image_bytes)
+    if error:
+        return render_result(error=error), 400
 
-    # Return the result as json
-    result = {
-        "face_found_in_image": face_found,
-        "known_image": is_match,
-        "is_picture_of": fileImg
-    }
-    #return jsonify(result)
-    return render_template('result.html', is_match=is_match, fileImg=fileImg, sourceImg=final_data, face_found=face_found)
+    return render_result(
+        faces=faces,
+        source_image=base64.b64encode(image_bytes).decode("ascii"),
+        source_mime=upload.mimetype or "image/jpeg",
+    )
+
+
+@app.errorhandler(413)
+def upload_too_large(_):
+    limit = MAX_UPLOAD_BYTES // (1024 * 1024)
+    return render_result(error=f"That image is larger than the {limit} MB limit."), 413
+
+
+@app.route("/healthz")
+def healthz():
+    if recognizer is None:
+        return {"status": "degraded", "known_faces": 0}, 503
+    return {"status": "ok", "known_faces": len(recognizer.names)}
 
 
 if __name__ == "__main__":
-    app.run()
+    # Port 5000 is taken by AirPlay Receiver on macOS, which also binds IPv6 and
+    # answers everything else with 403 -- so http://localhost:5000 hits AirPlay
+    # rather than this app. Default to 5001, where the unused IPv6 port refuses
+    # fast and the browser falls back to IPv4.
+    app.run(host="localhost", port=int(os.environ.get("PORT", 5001)), debug=True)

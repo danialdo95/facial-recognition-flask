@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Downloaded ONNX models (fetched at build time)
+models/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
